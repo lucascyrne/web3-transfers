@@ -1,5 +1,5 @@
 import Web3 from 'web3'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import styles from '../styles/Home.module.css'
 import { ethers } from 'ethers';
 
@@ -9,7 +9,7 @@ export default function Home() {
   const tokenInterface = require('../abi/erc20.json');
 
   const [amount, setAmount] = useState<string | null>(null)
-  const [token, setToken] = useState<string>("cREAL")
+  const [token, setToken] = useState<string>("A-CELO")
 
   const toWei = (amount: string) => {
     return Web3.utils.toWei(amount, 'ether');
@@ -18,13 +18,12 @@ export default function Home() {
   const transfer = async () => {
     if (amount === null) return;
 
-    let tokenAddress: any;
+    let tokenAddress: null | string;
     const utils = ethers.utils;
     const Wallet = ethers.Wallet;
     const BigNumber = ethers.BigNumber;
     const providers = ethers.providers;
     let provider = await new providers.JsonRpcProvider("https://celo-alfajores.infura.io/v3/ccdabf1a8fb04538880f3865b7120dd3");
-
 
     // todo: get user address and private key
     const from = "0x42Fe5DA4e1a08e8644AEc36Ddcc08677A7b17e1B";
@@ -39,8 +38,7 @@ export default function Home() {
     } else if (token === "cUSD") {
       tokenAddress = "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1";
     } else {
-      console.error('token address missing');
-      return;
+      tokenAddress = null;
     }
 
     let wallet = new Wallet(privateKey);
@@ -48,34 +46,47 @@ export default function Home() {
 
     provider.getGasPrice()
       .then((currentGasPrice) => {
-        let contract = new ethers.Contract(
-          tokenAddress,
-          tokenInterface,
-          walletSigner
-        )
+        if (tokenAddress) {
+          // * erc20 transfer
+          console.log(1);
+          let contract = new ethers.Contract(
+            tokenAddress,
+            tokenInterface,
+            walletSigner
+          )
 
-        let _amount = utils.parseUnits(amount, 18);
+          let _amount = utils.parseUnits(amount, 18);
 
-        contract.transfer(to, _amount).then((transferResult: any) => {
-          console.dir(transferResult)
-          alert("sent token")
-        })
+          contract.transfer(to, _amount).then((transferResult: any) => {
+            console.dir(transferResult)
+            alert("sent token")
+          })
+        } else {
+          // * native token transfer
+          console.log(2);
+          const tx = {
+            from: from,
+            to: to,
+            value: utils.parseEther(amount),
+            nonce: provider.getTransactionCount(
+              from,
+              "latest"
+            ),
+            gasLimit: utils.hexlify(100000),
+            gasPrice: currentGasPrice,
+          }
+          console.dir(tx)
+          try {
+            walletSigner.sendTransaction(tx).then((transaction) => {
+              console.dir(transaction)
+              alert("Send finished!")
+            })
+          } catch (error) {
+            alert("failed to send!!")
+          }
+        }
       })
   }
-
-  /* useEffect(() => {
-    (async () => {
-      try {
-        if (window.ethereum) {
-          await window.ethereum.request({
-            method: "eth_requestAccounts"
-          });
-        }
-      } catch (err) {
-        console.error(err)
-      }
-    })();
-  }, []) */
 
   return (
     <>
@@ -83,13 +94,12 @@ export default function Home() {
         <h2>Token Transfers on Alfajores Testnet</h2>
         <div><b>TO (test wallet):</b> 0xE7AE37EEe6b95852768dB502FB3BB160De1D952a</div>
         <select placeholder='select token' onChange={(e) => setToken(e.target.value)}>
+          <option value="A-CELO">A-CELO</option>
           <option value="cREAL">cREAL</option>
           <option value="cUSD">cUSD</option>
           <option value="cEUR">cEUR</option>
         </select>
         <input type="number" placeholder="amount" onChange={(e) => setAmount(e.target.value)} />
-        {/* <input type="text" placeholder="token address" onChange={(e) => setTokenAddress(e.target.value)} /> */}
-        {/* <input type="text" placeholder="to" onChange={(e) => setTo(e.target.value)} /> */}
         <button onClick={transfer}>TRANSFER</button>
       </main>
     </>
